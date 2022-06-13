@@ -69,24 +69,26 @@ class WERConfig {
 
     WriteToRegistry() {
         # Confirming all of the properties exist
+        Write-Verbose "Writing WER config to registry"
         foreach ($KeyPropString in $Script:WerPropertyArray) {
             $KeyPropSplit = $KeyPropString.Split("!")
             $KeyPropName = $KeyPropSplit[0]
             $KeyPropType = $KeyPropSplit[1]
-
+            Write-Verbose "Processing Property $KeyPropName"
             if (Get-ItemProperty -Path $this._KeyPath -Name $KeyPropName -ErrorAction SilentlyContinue) {
                 switch ($KeyPropName) {
                     "DumpType" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._DumpType -Type $KeyPropType
+                        # NOTE(wiaftrin): reg add doesn't see to run into permissions issues...
+                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._DumpType -ErrorAction Stop
                     }
                     "DumpFolder" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpFolder -Type $KeyPropType
+                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpFolder -ErrorAction Stop
                     }
                     "DumpCount" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpCount -Type $KeyPropType
+                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpCount -ErrorAction Stop
                     }
                     "CustomDumpFlags" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._CustomDumpFlags -Type $KeyPropType
+                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._CustomDumpFlag -ErrorAction Stop
                     }
                 }
             }
@@ -180,33 +182,26 @@ function Get-WERConfig {
 function Set-WERConfig {
     [CmdletBinding()]
     param(
-        [Parameter(ParameterSetName = "Named")]
-        [string]$AppName = "",
-        [Parameter(ParameterSetName = "Pipeline",
-            ValueFromPipeLine = $true)]
-        [WERConfig]$InputObject,
-        [Parameter(ParameterSetName = "Named")]
+        [string]$AppName = "GLOBAL",
         [ValidateSet("CustomDump", "MiniDump", "FullDump")]
         [string]$DumpType,
-        [Parameter(ParameterSetName = "Named")]
         [string]$DumpFolder,
-        [Parameter(ParameterSetName = "Named")]
         [uint]$DumpCount,
-        [Parameter(ParameterSetName = "Named")]
         [uint]$CustomDumpFlags
     )
+
     Write-Verbose "AppName $AppName"
     $KeyPath = $Script:WERRoot
     $WERConfig
-    if ($AppName -eq "") {
-        $WERConfig = Process-WERKey -AppName "GLOBAL" -KeyPath $KeyPath
+    if ($AppName -eq "GLOBAL") {
+        $WERConfig = Process-WERKey -AppName $AppName -KeyPath $KeyPath
     }
     elseif ($AppName) {
         # Normalizing the AppName
         if (!$AppName.EndsWith(".exe")) { $AppName += ".exe" }
         $KeyPath += "\$AppName"
-        if (!Test-Path $KeyPath) {
-            throw "$KeyPath not found"
+        if (!(Test-Path $KeyPath)) {
+            New-Item $KeyPath -ItemType
         }
         $WERConfig = Process-WERKey -AppName $AppName -KeyPath $KeyPath
     }
@@ -220,13 +215,8 @@ function Set-WERConfig {
         $WERConfig._CustomDumpFlags = $_CustomDumpFlags
     }
 
-    # TODO(wiaftrin): Fix this
-    try {
-        $WERConfig.WriteToRegistry()
-    }
-    catch {
-        Write-Error
-    }
+    try { $WERConfig.WriteToRegistry() }
+    catch { Write-Error $_ }
 
 }
 
