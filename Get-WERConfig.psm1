@@ -31,7 +31,7 @@ $Script:CustomDumpFlagArray = @(
 )
 $Script:WerPropertyArray = @(
     "DumpType!DWord",
-    "DumpFolder!String",
+    "DumpFolder!ExpandString",
     "DumpCount!DWord",
     "CustomDumpFlags!DWord"
 )
@@ -43,17 +43,17 @@ class WERConfig {
     [string]$DumpFolder
     [uint]$DumpCount
     [string]$CustomDumpFlags
-    [uint]$_DumpType
-    [uint]$_CustomDumpFlags
-    [string]$_KeyPath
+    [uint]$DumpTypeValue
+    [uint]$CustomDumpFlagsValue
+    [string]$KeyPath
 
     WERConfig([string]$KeyPath) {
-        $this._KeyPath = $KeyPath
+        $this.KeyPath = $KeyPath
         $Name = $KeyPath.Substring($KeyPath.LastIndexOf("\") + 1)
         $this.AppName = if ( $Name -eq "LocalDumps") { "GLOBAL" } else { $Name }
     }
 
-    [bool]SetDumpType([string]$DumpType) {
+    SetDumpType([string]$DumpType) {
         $DumpInt = -1
         switch ($DumpType) {
             "CustomDump" { $DumpInt = 0 }
@@ -62,9 +62,8 @@ class WERConfig {
             default { $DumpInt = -1 }
         }
 
-        $this._DumpType = $DumpInt
+        $this.DumpTypeValue = $DumpInt
         $this.DumpType = $DumpType
-        return ($DumpInt -ne -1)
     }
 
     WriteToRegistry() {
@@ -74,37 +73,39 @@ class WERConfig {
             $KeyPropSplit = $KeyPropString.Split("!")
             $KeyPropName = $KeyPropSplit[0]
             $KeyPropType = $KeyPropSplit[1]
-            Write-Verbose "Processing Property $KeyPropName"
-            if (Get-ItemProperty -Path $this._KeyPath -Name $KeyPropName -ErrorAction SilentlyContinue) {
+
+            if (Get-ItemProperty -Path $this.KeyPath -Name $KeyPropName -ErrorAction SilentlyContinue) {
+                Write-Verbose "Setting property $KeyPropName"
                 switch ($KeyPropName) {
                     "DumpType" {
                         # NOTE(wiaftrin): reg add doesn't see to run into permissions issues...
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._DumpType -ErrorAction Stop
+                        Set-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.DumpTypeValue -ErrorAction Stop
                     }
                     "DumpFolder" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpFolder -ErrorAction Stop
+                        Set-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.DumpFolder -ErrorAction Stop
                     }
                     "DumpCount" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpCount -ErrorAction Stop
+                        Set-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.DumpCount -ErrorAction Stop
                     }
                     "CustomDumpFlags" {
-                        Set-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._CustomDumpFlag -ErrorAction Stop
+                        Set-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this._CustomDumpFlag -ErrorAction Stop
                     }
                 }
             }
             else {
+                Write-Verbose "Creating property $KeyPropName"
                 switch ($KeyPropName) {
                     "DumpType" {
-                        New-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._DumpType -PropertyType $KeyPropType
+                        New-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.DumpTypeValue -PropertyType $KeyPropType
                     }
                     "DumpFolder" {
-                        New-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpFolder -PropertyType $KeyPropType
+                        New-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.DumpFolder -PropertyType $KeyPropType
                     }
                     "DumpCount" {
-                        New-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this.DumpCount -PropertyType $KeyPropType
+                        New-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.DumpCount -PropertyType $KeyPropType
                     }
                     "CustomDumpFlags" {
-                        New-ItemProperty -Path $this._KeyPath -Name $KeyPropName -Value $this._CustomDumpFlags -PropertyType $KeyPropType
+                        New-ItemProperty -Path $this.KeyPath -Name $KeyPropName -Value $this.CustomDumpFlagsValue -PropertyType $KeyPropType
                     }
                 }
             }
@@ -121,10 +122,11 @@ function Process-WERKey {
         [string]$AppName,
         [string]$KeyPath
     )
-
+    Write-Verbose "Processing WER Key for $AppName"
     $DumpsKey = Get-ItemProperty $KeyPath
 
     $Config = [WERConfig]::new($KeyPath)
+
     $DumpType = ""
     switch ($DumpsKey.DumpType) {
         0 { $DumpType = "CustomDump" }
@@ -132,13 +134,17 @@ function Process-WERKey {
         2 { $DumpType = "FullDump" }
         default { $DumpType = "MiniDump" }
     }
+
     $Config.DumpType = $DumpType
-    if ($DumpsKey.DumpType) { $Config._DumpType = $DumpsKey.DumpType }
+    $Config.DumpTypeValue = if ($DumpsKey.DumpType) { $DumpsKey.DumpType } else { 1 }
     $Config.DumpFolder = if ($DumpsKey.DumpFolder) { $DumpsKey.DumpFolder } else { "%LOCALAPPDATA%\CrashDumps" }
     $Config.DumpCount = if ($DumpsKey.DumpCount) { $DumpsKey.DumpCount } else { 10 }
 
+    Write-Verbose "Checking custom dump flags"
     if ($Config.DumpType -eq "CustomDump" -and $DumpsKey.CustomDumpFlags) {
+
         $ParsedFlags = ""
+
         foreach ($FlagString in $Script:CustomDumpFlagArray) {
             $FlagSplit = $FlagString.Split("!")
             $FlagName = $FlagSplit[0]
@@ -148,8 +154,9 @@ function Process-WERKey {
             }
         }
         if ($ParsedFlags[-1] -eq '|') { $ParsedFlags = $ParsedFlags.Substring(0, $ParsedFlags.Length - 1) }
+
         $Config.CustomDumpFlags = $ParsedFlags
-        $Config._CustomDumpFlags = $DumpsKey.CustomDumpFlags
+        $Config.CustomDumpFlagsValue = $DumpsKey.CustomDumpFlags
     }
     else {
         $Config.CustomDumpFlags = "NONE"
@@ -169,9 +176,11 @@ function Get-WERConfig {
         $AppName
     )
     Write-Verbose "Processing Global Key $Script:WERRoot"
-    Process-WERKey -KeyPath $Script:WERRoot -AppName "GLOBAL"
+    if (Test-Path $Script:WERRoot) {
+        Process-WERKey -KeyPath $Script:WERRoot -AppName "GLOBAL"
+    }
     Write-Verbose "Checking for specific app config"
-    (Get-ChildItem $Script:WERRoot).Name | ForEach-Object {
+    (Get-ChildItem $Script:WERRoot -ErrorAction SilentlyContinue).Name | ForEach-Object {
         $KeyPath = $_
         Write-Verbose "Processing $KeyPath"
         Process-WERKey -KeyPath "Registry::$KeyPath" -AppName $KeyPath.Substring($KeyPath.LastIndexOf("\") + 1)
@@ -192,8 +201,11 @@ function Set-WERConfig {
 
     Write-Verbose "AppName $AppName"
     $KeyPath = $Script:WERRoot
-    $WERConfig
+    $WERConfig = ""
     if ($AppName -eq "GLOBAL") {
+        if (!(Test-Path $KeyPath)) {
+            Write-Error "$KeyPath not found" -ErrorAction Stop
+        }
         $WERConfig = Process-WERKey -AppName $AppName -KeyPath $KeyPath
     }
     elseif ($AppName) {
@@ -201,23 +213,94 @@ function Set-WERConfig {
         if (!$AppName.EndsWith(".exe")) { $AppName += ".exe" }
         $KeyPath += "\$AppName"
         if (!(Test-Path $KeyPath)) {
-            New-Item $KeyPath -ItemType
+            Write-Error "$KeyPath not found" -ErrorAction Stop
         }
         $WERConfig = Process-WERKey -AppName $AppName -KeyPath $KeyPath
     }
 
-    $WERConfig.SetDumpType($DumpType)
-    $WERConfig.DumpCount = $DumpCount
-    $WERConfig.DumpFolder = $DumpFolder
+    if ($DumpType) { $WERConfig.SetDumpType($DumpType) }
+    if ($DumpCount) { $WERConfig.DumpCount = $DumpCount }
+    if ($DumpFolder) { $WERConfig.DumpFolder = $DumpFolder }
 
     if ($DumpType -eq "CustomDump") {
         # TODO(wiaftrin): Add flag validation
-        $WERConfig._CustomDumpFlags = $_CustomDumpFlags
+        $WERConfig.CustomDumpFlagsValue = $CustomDumpFlagsValue
     }
 
     try { $WERConfig.WriteToRegistry() }
-    catch { Write-Error $_ }
+    catch { Write-Error $_ -ErrorAction Stop }
 
+}
+
+function New-WERConfig {
+    [CmdletBinding()]
+    param(
+        [string]$AppName = "GLOBAL",
+        [ValidateSet("CustomDump", "MiniDump", "FullDump")]
+        [string]$DumpType,
+        [string]$DumpFolder,
+        [uint]$DumpCount,
+        [uint]$CustomDumpFlags
+    )
+
+    Write-Verbose "AppName $AppName"
+    $KeyPath = $Script:WERRoot
+    if ($AppName -ne "GLOBAL") {
+        if (!$AppName.EndsWith(".exe")) { $AppName += ".exe" }
+        $KeyPath += "\$AppName"
+    }
+
+    Write-Verbose "Checking if $KeyPath exists"
+    if (Test-Path $KeyPath) { Write-Error "$KeyPath already exists" -ErrorAction Stop }
+    New-Item $KeyPath -Force | Out-Null
+
+    $WERConfig = [WERConfig]::new($KeyPath)
+    $WERConfig.SetDumpType($DumpType)
+    $WERConfig.DumpFolder = $DumpFolder
+    $WERConfig.DumpCount = $DumpCount
+    if ($DumpType -eq "CustomDumpType") {
+        $WERConfig.CustomDumpFlagsValue = $CustomDumpFlags
+    }
+
+    try { $WERConfig.WriteToRegistry() }
+    catch { Write-Error $_ -ErrorAction Stop }
+}
+
+function Remove-WERConfig {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High", DefaultParameterSetName = "Individual")]
+    param(
+        [Parameter(ParameterSetName = "Individual")]
+        [string]$AppName = "GLOBAL",
+        [Parameter(ParameterSetName = "Pipeline")]
+        [WERConfig]$InputObject = $null,
+        [switch]$Force
+    )
+
+    $OldSetting = $ConfirmPreference
+
+    if ($Force) {
+        $ConfirmPreference = "None"
+    }
+
+    if ($null -ne $InputObject) {
+        $AppName = $InputObject.AppName
+    }
+
+    Write-Verbose "AppName $AppName"
+    $KeyPath = $Script:WERRoot
+    if ($AppName -eq "GLOBAL") {
+        Write-Warning "Removing the global WER settings will remove all application specific settings"
+        if (!$PSCmdlet.ShouldProcess("Global WER Configuration")) {
+            return
+        }
+    }
+    else {
+        if (!$AppName.EndsWith(".exe")) { $AppName += ".exe" }
+        $KeyPath += "\$AppName"
+    }
+
+    Remove-Item $KeyPath
+    $ConfirmPreference = $OldSetting
 }
 
 function Get-WERInfo {
