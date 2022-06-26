@@ -100,7 +100,7 @@ A PowerShell wrapper for the Windows Error Reporting (WER) registry settings.
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags                     = @('WER', 'Dump', 'Crash', 'Windows', "Debug", "Windos Error Reporting")
+            Tags                     = @('WER', 'Dump', 'Crash', 'Windows', "Debug")
 
             # A URL to the license for this module.
             LicenseUri               = 'https://github.com/WAftring/Get-WERConfig/blob/master/LICENSE'
