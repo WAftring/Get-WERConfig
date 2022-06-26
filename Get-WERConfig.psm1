@@ -68,10 +68,6 @@ class WERConfig {
         $this.DumpType = $DumpType
     }
 
-    SetCustomDumpType([uint64]$CustomValue) {
-
-    }
-
     WriteToRegistry() {
         # Confirming all of the properties exist
         Write-Verbose "Writing WER config to registry"
@@ -141,7 +137,7 @@ function Read-WERKey {
     }
 
     $Config.DumpType = $DumpType
-    $Config.DumpTypeValue = if ($DumpsKey.DumpType) { $DumpsKey.DumpType } else { 1 }
+    $Config.DumpTypeValue = if ($null -ne $DumpsKey.DumpType) { $DumpsKey.DumpType } else { 1 }
     $Config.DumpFolder = if ($DumpsKey.DumpFolder) { $DumpsKey.DumpFolder } else { "%LOCALAPPDATA%\CrashDumps" }
     $Config.DumpCount = if ($DumpsKey.DumpCount) { $DumpsKey.DumpCount } else { 10 }
     $Config.CustomDumpFlags = $DumpsKey.CustomDumpFlags
@@ -199,7 +195,7 @@ function Get-WERConfig {
 #endregion
 
 function Set-WERConfig {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
     param(
         [string]$AppName = "GLOBAL",
         [ValidateSet("CustomDump", "MiniDump", "FullDump")]
@@ -238,19 +234,24 @@ function Set-WERConfig {
     if ($DumpFolder) { $WERConfig.DumpFolder = $DumpFolder }
     if ($CustomDumpFlags) { $WERConfig.CustomDumpFlags = $CustomDumpFlags }
 
-    try { $WERConfig.WriteToRegistry() }
+    try {
+        if ($PSCmdlet.ShouldProcess($WERConfig.KeyPath, "Update WER configuration")) {
+            $WERConfig.WriteToRegistry()
+            $WERConfig
+        }
+    }
     catch { Write-Error $_ -ErrorAction Stop }
 
 }
 
 function New-WERConfig {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
     param(
         [string]$AppName = "GLOBAL",
         [ValidateSet("CustomDump", "MiniDump", "FullDump")]
-        [string]$DumpType,
-        [string]$DumpFolder,
-        [uint64]$DumpCount,
+        [string]$DumpType = $null,
+        [string]$DumpFolder = $null,
+        [uint64]$DumpCount = $null,
         [uint64]$CustomDumpFlags = 0
     )
 
@@ -274,8 +275,11 @@ function New-WERConfig {
     if ($CustomDumpFlags) { $WERConfig.CustomDumpFlags = $CustomDumpFlags }
 
     try {
-        $WERConfig.WriteToRegistry()
-        return $WERConfig
+        if ($PSCmdlet.ShouldProcess($WERConfig.KeyPath, "Write config to registry")) {
+            $WERConfig.WriteToRegistry()
+            $WERConfig = Read-WERKey -KeyPath $KeyPath -AppName $AppName
+        }
+        $WERConfig
     }
     catch { Write-Error $_ -ErrorAction Stop }
 }
