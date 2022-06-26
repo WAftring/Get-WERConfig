@@ -257,20 +257,21 @@ function New-WERConfig {
     Write-Verbose "AppName $AppName"
     $KeyPath = $Script:WERRoot
     if ($AppName -ne "GLOBAL") {
+        Write-Verbose "Appending AppName"
         if (!$AppName.EndsWith(".exe")) { $AppName += ".exe" }
         $KeyPath += "\$AppName"
     }
 
     Write-Verbose "Checking if $KeyPath exists"
-    if (Test-Path $KeyPath) { Write-Error "$KeyPath already exists" -ErrorAction Stop }
+    if (Test-Path $KeyPath) { throw "$KeyPath already exists" }
     New-Item $KeyPath -Force | Out-Null
 
     #FIXME(will): These outputs end up being wrong because of the defaults
     $WERConfig = [WERConfig]::new($KeyPath)
-    $WERConfig.SetDumpType($DumpType)
-    $WERConfig.DumpFolder = $DumpFolder
-    $WERConfig.DumpCount = $DumpCount
-    $WERConfig.CustomDumpFlags = $CustomDumpFlags
+    if ($DumpType) { $WERConfig.SetDumpType($DumpType) }
+    if ($DumpFolder) { $WERConfig.DumpFolder = $DumpFolder }
+    if ($DumpCount) { $WERConfig.DumpCount = $DumpCount }
+    if ($CustomDumpFlags) { $WERConfig.CustomDumpFlags = $CustomDumpFlags }
 
     try {
         $WERConfig.WriteToRegistry()

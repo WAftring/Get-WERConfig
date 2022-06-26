@@ -9,23 +9,11 @@ Import-Module ".\Get-WERConfig.psm1"
 $Script:WERRoot = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
 function Assert-Condition {
     param(
-        $Condition1,
-        $Condition2,
-        [ValidateSet("EQ", "NEQ")]
-        $Comparison,
+        [bool]$Result,
         $Msg
     )
-    if ($Comparison -eq "EQ") {
-        if ($Condition1 -ne $Condition2) {
-            Write-Host "$Condition1 != $Condition2"
-            throw $Msg
-        }
-    }
-    else {
-        if ($Condition1 -eq $Condition2) {
-            Write-Host "$Condition1 == $Condition2"
-            throw $Msg
-        }
+    if (!$Result) {
+        throw $Msg
     }
 }
 
@@ -42,15 +30,16 @@ function Test1 {
     $WerObj = New-WERConfig -DumpType MiniDump -DumpFolder "%LOCALAPPDATA%\CrashDumps" -DumpCount 1
 
     try {
-        Assert-Condition $WerObj.DumpType "MiniDump" "DumpType string mismatch" -Comparison EQ
-        Assert-Condition $WerObj.DumpTypeValue 1 "DumpType value mismatch"
-        Assert-Condition $WerObj.DumpFolder "%LOCALAPPDATA%\CrashDumps" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 1 "DumpCount mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags "" "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $Script:WERRoot "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "MiniDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 1) "DumpType value mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "%LOCALAPPDATA%\CrashDumps") "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 1) "DumpCount mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq "") "CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq $Script:WERRoot) "KeyPath mismatch"
         return $true
     }
     catch {
+        Write-Host $_
         return $false
     }
 
@@ -61,12 +50,12 @@ function Test2 {
     $WerObj = New-WERConfig -AppName "exceptions" -DumpFolder "C:\CrashDumps" -DumpCount 10 -DumpType "FullDump"
 
     try {
-        Assert-Condition $WerObj.DumpType "FullDump" "DumpType string mismatch"
-        Assert-Condition $WerObj.DumpFolder "C:\CrashDumps" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 10 "DumpCount mismatch"
-        Assert-Condition $WerObj.DumpTypeValue 2 "DumpTypeValue mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags "" "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $($Script:WERRoot + "\exceptions.exe") "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "FullDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "C:\CrashDumps" ) "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 10 )  "DumpCount mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 2 ) "DumpTypeValue mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq "" ) "CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq ($Script:WERRoot + "\exceptions.exe")) "KeyPath mismatch"
         return $true
     }
     catch {
@@ -80,12 +69,12 @@ function Test3 {
     $WerObj = Get-WERConfig -AppName "exceptions.exe"
 
     try {
-        Assert-Condition $WerObj.DumpType "FullDump" "DumpType string mismatch"
-        Assert-Condition $WerObj.DumpFolder "C:\CrashDumps" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 10 "DumpCount mismatch"
-        Assert-Condition $WerObj.DumpTypeValue 2 "DumpTypeValue mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags "" "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $($Script:WERRoot + "\exceptions.exe") "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "FullDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "C:\CrashDumps") "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 10 ) "DumpCount mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 2 ) "DumpTypeValue mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq "" ) "CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq ($Script:WERRoot + "\exceptions.exe"))"KeyPath mismatch"
         return $true
     }
     catch {
@@ -97,12 +86,12 @@ function Test3 {
 function Test4 {
     $WerObj = Get-WERConfig
     try {
-        Assert-Condition $WerObj.DumpType "MiniDump" "DumpType string mismatch"
-        Assert-Condition $WerObj.DumpFolder "%LOCALAPPDATA%\CrashDumps" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 10 "DumpCount mismatch"
-        Assert-Condition $WerObj.DumpTypeValue 1 "DumpTypeValue mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags "" "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $Script:WERRoot "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "MiniDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "%LOCALAPPDATA%\CrashDumps") "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 10 ) "DumpCount mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 1 ) "DumpTypeValue mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq "" ) "CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq $Script:WERRoot) "KeyPath mismatch"
         return $true
     }
     catch {
@@ -116,12 +105,12 @@ function Test5 {
     $WerObj = Get-WERConfig -AppName "exceptions"
 
     try {
-        Assert-Condition $WerObj.DumpType "MiniDump" "DumpType string mismatch"
-        Assert-Condition $WerObj.DumpFolder "C:\" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 10 "DumpCount mismatch"
-        Assert-Condition $WerObj.DumpTypeValue 1 "DumpTypeValue mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags "" "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $($Script:WERRoot + "\exceptions.exe") "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "MiniDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "C:\") "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 10 ) "DumpCount mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 1 ) "DumpTypeValue mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq "" ) "CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq ($Script:WERRoot + "\exceptions.exe")) "KeyPath mismatch"
         return $true
     }
     catch {
@@ -135,12 +124,12 @@ function Test6 {
     $WerObj = Get-WERConfig
 
     try {
-        Assert-Condition $WerObj.DumpType "FullDump" "DumpType string mismatch"
-        Assert-Condition $WerObj.DumpFolder "C:\CrashDumps" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 50 "DumpCount mismatch"
-        Assert-Condition $WerObj.DumpTypeValue 2 "DumpTypeValue mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags "" "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $Script:WERRoot "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "FullDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "C:\CrashDumps" ) "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 50 ) "DumpCount mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 2 ) "DumpTypeValue mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq "" )"CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq $Script:WERRoot) "KeyPath mismatch"
         return $true
     }
     catch {
@@ -153,12 +142,12 @@ function Test7 {
     $WerObj = New-WERConfig -AppName "exceptions2.exe" -DumpType "CustomDump" -CustomDumpFlags 0x00000121 -DumpCount 3 -DumpFolder "C:\CrashDumps"
 
     try {
-        Assert-Condition $WerObj.DumpType "CustomDump" "DumpType string mismatch"
-        Assert-Condition $WerObj.DumpFolder "C:\CrashDumps" "DumpFolder mismatch"
-        Assert-Condition $WerObj.DumpCount 3 "DumpCount mismatch"
-        Assert-Condition $WerObj.DumpTypeValue 0 "DumpTypeValue mismatch"
-        Assert-Condition $WerObj.CustomDumpFlags 0x00000121 "CustomDumpFlags mismatch"
-        Assert-Condition $WerObj.KeyPath $($Script:WERRoot + "\exceptions2.exe") "KeyPath mismatch"
+        Assert-Condition $($WerObj.DumpType -eq "CustomDump") "DumpType string mismatch"
+        Assert-Condition $($WerObj.DumpFolder -eq "C:\CrashDumps" ) "DumpFolder mismatch"
+        Assert-Condition $($WerObj.DumpCount -eq 3 ) "DumpCount mismatch"
+        Assert-Condition $($WerObj.DumpTypeValue -eq 0 ) "DumpTypeValue mismatch"
+        Assert-Condition $($WerObj.CustomDumpFlags -eq 0x00000121 ) "CustomDumpFlags mismatch"
+        Assert-Condition $($WerObj.KeyPath -eq ($Script:WERRoot + "\exceptions2.exe")) "KeyPath mismatch"
         return $true
     }
     catch {
@@ -168,16 +157,33 @@ function Test7 {
 }
 
 function Test8 {
-    New-WERConfig -AppName "ApplicationA" -DumpType 2
-    Get-WERConfig -AppName "exc*" | Remove-WERConfig
-    Get-WERConfig -AppName All | ForEach-Object {
-        Assert
+    New-WERConfig -AppName "ApplicationA" -DumpType "FullDump" | Out-Null
+    Get-WERConfig -AppName "exc*" | Remove-WERConfig | Out-Null
+    $Result = Get-WERConfig -AppName All
+    try {
+        Assert-Condition $($Result.Count -eq 2) "Items not removed"
+        return $true
     }
+    catch {
+        Write-Host $_
+        return $false
+    }
+}
 
+function Test9 {
+    try {
+        New-WERConfig -AppName "ApplicationA" -DumpType "FullDump"
+        Write-Host "Didn't catch duplicate"
+        return $false
+    }
+    catch {
+        return $true
+    }
 }
 
 # Start by clearing out all settings
-Remove-WERConfig -AppName "GLOBAL" -Force
+Write-Host "Clearing out key for tests"
+Remove-WERConfig -AppName "GLOBAL" -Force -ErrorAction SilentlyContinue
 
 # Create base container
 Write-Host "TEST #1: Creating a new WER global key"
@@ -208,8 +214,16 @@ Write-Result -Success $(Test6)
 Write-Host "TEST #7: Creating a new app config with custom dump settings"
 Write-Result -Success $(Test7)
 
-# Clean everything up with pipeline
+# Clean specific app with pipeline
 Write-Host "TEST #8: Remove exc* configurations"
 Write-Result -Success $(Test8)
+
+# Duplicate testing
+Write-Host "TEST #9: Attempt to add duplicate"
+Write-Result -Success $(Test9)
+
+# Remove everything
+Write-Host "Cleaning up..."
+Remove-WERConfig -AppName "GLOBAL" -Force
 
 Remove-Module Get-WERConfig
