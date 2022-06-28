@@ -325,6 +325,6 @@ function Remove-WERConfig {
 }
 
 function Get-WERInfo {
-    Get-WERConfig | Format-Table
+    Get-WERConfig -AppName "All" | Format-Table
     Get-WinEvent -FilterHashTable @{LogName = "Application"; Id = 1001 } -MaxEvents 5
 }
